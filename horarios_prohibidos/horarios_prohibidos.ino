@@ -7,6 +7,7 @@
 
 #define COLS 16
 #define ROWS 2
+#define NUM_ALARMAS 3
 
 LiquidCrystal lcd(12,11,5,4,3,2);
 tmElements_t datetime;
@@ -21,15 +22,44 @@ void setup() {
     lcd.print("Fallo de RTC");
   else
     lcd.print("Sincronizado con RTC");
-  EventoHDB;
-  //Programar horarios prohibidos
-  //Recuerda ponerlos desfasados -4 min
-  Alarm.alarmRepeat(dowTuesday, 17, 26, 0,EventoHP);
-  Alarm.alarmRepeat(dowTuesday, 19, 26, 0,EventoHDB);
-  Alarm.alarmRepeat(dowThursday, 11, 26, 0,EventoHP);
-  Alarm.alarmRepeat(dowThursday, 13, 26, 0,EventoHDB);
-  Alarm.alarmRepeat(21, 26, 0, EventoHP);
-  Alarm.alarmRepeat(8, 26, 0, EventoHDB);
+  /**PROGRAMAR HORARIOS PROHIBIDOS**/
+  /**Recuerda ponerlos desfasados -4 min
+   * Estructura de la matriz de horarios {diadelasemana, horas, minutos, DURACIÓN}
+   * diadelasemana 1~7 y COMIENZA EN DOMINGO
+  **/
+  int Horarios_prohibidos_init[NUM_ALARMAS][4] = {
+    {3,17,24,2},
+    {5,11,26,0},
+    {5,15,26,0}
+  };
+  /**PROGRAMAR APERTURA Y CIERRE**/
+  /**Recuerda ponerlos desfasados -4 min
+   * Estructura de la matriz de horarios {diadelasemana, horas, minutos, DURACIÓN}
+   * diadelasemana 1~7 y COMIENZA EN DOMINGO
+  **/
+  int aperturaycierre[2][2] = {
+    {8,26},
+    {21,26}
+  };
+  
+  Alarm.alarmRepeat(aperturaycierre[0][0], aperturaycierre[0][1], 0, EventoHDB);//ID alarma = 0
+  Alarm.alarmRepeat(aperturaycierre[1][0], aperturaycierre[1][1], 0, EventoHP);//ID alarma = 1
+  Alarm.alarmRepeat(Horarios_prohibidos_init[0][0], Horarios_prohibidos_init[0][1], Horarios_prohibidos_init[0][2], Horarios_prohibidos_init[0][3],EventoHP);//ID alarma = 2
+  Alarm.alarmRepeat(Horarios_prohibidos_init[1][0], Horarios_prohibidos_init[1][1], Horarios_prohibidos_init[1][2], Horarios_prohibidos_init[1][3],EventoHP);//ID alarma = 3
+  Alarm.alarmRepeat(Horarios_prohibidos_init[2][0], Horarios_prohibidos_init[2][1], Horarios_prohibidos_init[2][2], Horarios_prohibidos_init[2][3],EventoHP);//ID alarma = 4
+  
+  //check for initial status
+  RTC.read(datetime);
+  int flag = 0;
+  for(int i = 0; i <NUM_ALARMAS; i++){
+    if (weekday() == Horarios_prohibidos_init[i][0] && datetime.Hour >= Horarios_prohibidos_init[i][1]){
+      if (datetime.Hour <= Horarios_prohibidos_init[i][1]+Horarios_prohibidos_init[i][3]){
+        if (datetime.Minute <= Horarios_prohibidos_init[i][2]){flag = 1;}
+      }
+    }
+  };
+  if (flag == 1) {EventoHP();}
+  else {EventoHDB();};  
 }
 
 void loop() {
@@ -54,7 +84,15 @@ void imprimir_fecha(){
     lcd.print("Time: ");
     print2digits(datetime.Hour);
     lcd.write(':');
-    print2digits(datetime.Minute+4);
+    //Arreglamos el delay de 4 min que tiene.
+    //Sino, se descomenta la siguiente línea y se borran los bucles:
+    //print2digits(datetime.Minute);
+    if (datetime.Minute <=55){
+      print2digits(datetime.Minute+4);
+    }
+    else{
+      print2digits(datetime.Minute-56);
+    };
     lcd.write(':');
     print2digits(datetime.Second);
     lcd.setCursor(0, 1);
@@ -92,6 +130,7 @@ void EventoHP()
   lcd.setCursor(0, 0);
   lcd.print("Horas del mal");
   digitalWrite(8, HIGH);
+  delay(5000);
 }
  
 /**
@@ -103,7 +142,11 @@ void EventoHDB()
   lcd.setCursor(0, 0);
   lcd.print("Horas de bien");
   digitalWrite(8, LOW);
+  delay(5000);
 }
+/**
+   Funcion callback de fiesta yuju
+*/
 void fiesta(){
   lcd.clear();
   lcd.setCursor(0, 0);
