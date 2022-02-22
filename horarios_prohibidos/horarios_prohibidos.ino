@@ -22,6 +22,9 @@ void setup() {
   // Pero el error es despreciable, ya que implica que haya alguien que lo sepa en el momento
   // Y solo pasa una vez, o cuando se reconecta la alimentación
   horasLibertad();
+  // Igualmente me portaré bien y pondré un aviso
+  lcd.setCursor(10, 0);
+  lcd.print("Undef");
   
   // Programar horarios prohibidos
   //Alarmas semanales
@@ -87,7 +90,7 @@ void imprimir_fecha_hora(){
 void horasSilencio()
 {
   lcd.clear();
-  lcd.setCursor(0, 10);
+  lcd.setCursor(10, 0);
   lcd.print("SHHH!");
   digitalWrite(8, HIGH);
 }
@@ -98,8 +101,8 @@ void horasSilencio()
 void horasLibertad()
 {
   lcd.clear();
-  lcd.setCursor(0, 11);
-  lcd.print("Yay!");
+  lcd.setCursor(10, 0);
+  lcd.print("Yay!!");
   digitalWrite(8, LOW);
 }
 
