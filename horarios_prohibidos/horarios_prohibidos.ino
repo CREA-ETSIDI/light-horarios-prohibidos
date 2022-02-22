@@ -10,8 +10,7 @@ static LiquidCrystal lcd(12,11,5,4,3,2);
 static tmElements_t tm;
 
 void setup() {
-  pinMode(8, OUTPUT); 
-  Serial.begin(9600);
+  pinMode(8, OUTPUT);
   lcd.begin(COLS, ROWS);
   setSyncProvider(RTC.get);
   if (timeStatus() != timeSet)
@@ -39,6 +38,7 @@ void loop() {
   // Obtener la fecha y hora desde el chip RTC
   if (RTC.read(tm)) {
     imprimir_fecha_hora();
+    delay(50);
   }
   else {
     if (RTC.chipPresent()) {
@@ -48,6 +48,7 @@ void loop() {
       lcd.print("DS1307 DETENIDO");
       lcd.setCursor(0, 1);
       lcd.print("EJECUTE PROGRAMA");
+      delay(100);
     }
     else {
       // No se puede comunicar con el RTC en el bus I2C, revisar las conexiones.
@@ -55,6 +56,7 @@ void loop() {
       lcd.print("  DS1307 NO SE");
       lcd.setCursor(0, 1);
       lcd.print(" PUDO DETECTAR");
+      delay(100);
     }
   }
 }
