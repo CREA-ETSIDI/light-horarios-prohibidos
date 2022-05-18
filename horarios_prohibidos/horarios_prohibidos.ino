@@ -65,16 +65,14 @@ void loop() {
     delay(450); // Tiempo de espera lo suficientemente alto como para no procesar estados en los que no hay cambio
   }
   else {
-    lcd.clear();
     if (RTC.chipPresent()) {
       // El reloj esta detenido, es necesario ponerlo a tiempo
-      Serial.println("DS1307 DETENIDO");
+      Serial.print("DS1307 DETENIDO: ");
       Serial.println("EJECUTE PROGRAMA");
     }
     else {
       // No se puede comunicar con el RTC en el bus I2C, revisar las conexiones.
-      Serial.println("DS1307 NO SE");
-      Serial.println("PUDO DETECTAR");
+      Serial.print("DS1307 NO SE PUDO DETECTAR");
     }
     delay(100); // Si limpias la pantalla muy seguido se ve rara
   }
@@ -116,17 +114,17 @@ uint8_t instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
    Imprime la fecha desde la variable global "tm"
 */
 void imprimir_fecha_hora(){
-  // Hora en la fila superior
-  print2digits(tm.Hour);
+  // Hora
+  Serial.print(tm.Hour);
   Serial.print(':');
-  print2digits(tm.Minute);
+  Serial.print(tm.Minute);
   Serial.print(':');
-  print2digits(tm.Second);
-  Serial.println('');
-  // Fecha en la fila inferior
-  print2digits(tm.Day);
+  Serial.print(tm.Second);
+  Serial.print('\t');
+  // Fecha
+  Serial.print(tm.Day);
   Serial.print('/');
-  print2digits(tm.Month);
+  Serial.print(tm.Month);
   Serial.print('/');
   Serial.println(tmYearToCalendar(tm.Year));
 }
@@ -136,7 +134,6 @@ void imprimir_fecha_hora(){
 */
 void horasSilencio()
 {
-  lcd.setCursor(10, 0);
   Serial.println("SHHH!");
   digitalWrite(8, HIGH);
 }
@@ -146,19 +143,8 @@ void horasSilencio()
 */
 void horasLibertad()
 {
-  lcd.setCursor(10, 0);
   Serial.println("Yay!!");
   digitalWrite(8, LOW);
-}
-
-/**
-   Funcion auxiliar para imprimir siempre 2 digitos
-*/
-void print2digits(unsigned char number) {
-  if (number < 10) {
-    Serial.print('0');
-  }
-  Serial.print(number);
 }
 
 /**
