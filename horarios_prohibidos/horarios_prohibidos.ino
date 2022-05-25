@@ -3,15 +3,6 @@
 #include <DS1307RTC.h>
 
 // Definiciones de pines para cada placa
-#ifdef ARDUINO_AVR_UNO // Se usa cuando compilamos para un UNO
-  // LCD Pins definitions
-  #define LCD_RS 12
-  #define LCD_EN 11
-  #define LCD_D4 5
-  #define LCD_D5 4
-  #define LCD_D6 3
-  #define LCD_D7 2
-#endif //!ARDUINO_AVR_UNO
 #ifdef ARDUINO_AVR_NANO
   // LCD Pins definitions
   #define LCD_RS 7
@@ -21,9 +12,6 @@
   #define LCD_D6 3
   #define LCD_D7 2
 #endif //!ARDUINO_AVR_NANO
-
-#define COLS 16
-#define ROWS 2
 
 #define tmDow2secs(t) (t.hour * 3600UL + t.mins * 60UL + t.secs)
 typedef struct {
