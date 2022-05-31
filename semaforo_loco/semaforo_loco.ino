@@ -11,6 +11,10 @@
   #define LCD_D5 4
   #define LCD_D6 3
   #define LCD_D7 2
+  #define RED 8
+  #define BLUE 9
+  #define YELLOW 10
+  #define GREEN 11
 #endif //!ARDUINO_AVR_NANO
 
 #define tmDow2secs(t) (t.hour * 3600UL + t.mins * 60UL + t.secs)
@@ -147,4 +151,48 @@ bool isBetween_timeIgnoreDOW(dayOffset_t time1, dayOffset_t time2, dayOffset_t c
   }
   // else, t1Secs is upper end, so check belonging to the interval [t2Secs, t1Secs]
   return (cmpScs <= t2Secs || t1Secs <= cmpScs);
+}
+
+/** Modo fiestuqui, es posible que oara que funcione haya que cambiar delays por comparación de millis
+*/
+void lights()
+{
+  uint8_t i=0;
+  uint8_t j=0;
+  for (i=0; i=3; i++){
+    switch (i) {
+      case 0:
+        j= RED;
+      break;
+      case 0:
+        j= BLUE;
+      break;
+      case 0:
+        j= YELLOW;
+      break;
+      case 0:
+        j= GREEN;
+      break;
+    }
+    digitalWrite(j, HIGH);
+    digitalWrite(j, LOW);
+  }
+  for (i=3; i=0; i--){
+    switch (i) {
+      case 0:
+        j= RED;
+      break;
+      case 0:
+        j= BLUE;
+      break;
+      case 0:
+        j= YELLOW;
+      break;
+      case 0:
+        j= GREEN;
+      break;
+    }
+    digitalWrite(j, HIGH);
+    digitalWrite(j, LOW);
+  }
 }
