@@ -13,6 +13,15 @@
   #define GREEN 11
 #endif //!ARDUINO_AVR_NANO
 
+/* Some logging utilities */
+#ifdef LOG
+    #define serialLog(msg) Serial.print(msg)
+    #define serialLogLn(msg) Serial.println(msg)
+#else
+    #define serialLog(msg);
+    #define serialLogLn(msg);
+#endif
+
 #define tmDow2secs(t) (t.hour * 3600UL + t.mins * 60UL + t.secs)
 typedef struct {
   uint8_t hour;
@@ -32,7 +41,9 @@ static dayOffset_t td;
 static status currentStatus{instanteUndef}, prevStatus{instanteUndef};
 
 void setup() {
+#ifdef LOG
   Serial.begin(9600);
+#endif
   pinMode(MODE_SELECTOR, INPUT);
   pinMode(RED,    OUTPUT);
   pinMode(BLUE,   OUTPUT);
@@ -41,13 +52,15 @@ void setup() {
 
   setSyncProvider(RTC.get);
   if (timeStatus() != timeSet)
-    Serial.println("Fallo de RTC");
+    serialLogLn("Fallo de RTC");
 }
 
 void loop() {
   // Obtener la fecha y hora desde el chip RTC
   if (RTC.read(tm)) {
+#ifdef LOG
     imprimir_fecha_hora();
+#endif
 
     td.hour = tm.Hour;
     td.mins = tm.Minute;
@@ -78,16 +91,16 @@ void loop() {
         break;
       }
     }
+    customLog(currentStatus);
   }
   else {
     if (RTC.chipPresent()) {
       // El reloj esta detenido, es necesario ponerlo a tiempo
-      Serial.print("DS1307 DETENIDO: ");
-      Serial.println("EJECUTE PROGRAMA");
+      serialLog("DS1307 DETENIDO: EJECUTE PROGRAMA DE CARGA");
     }
     else {
       // No se puede comunicar con el RTC en el bus I2C, revisar las conexiones.
-      Serial.print("DS1307 NO SE PUDO DETECTAR");
+      serialLog("DS1307 NO SE PUDO DETECTAR");
     }
     delay(100); // Si limpias la pantalla muy seguido se ve rara
   }
@@ -131,36 +144,36 @@ enum status instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
 */
 void imprimir_fecha_hora(){
   // Hora
-  Serial.print(tm.Hour);
-  Serial.print(':');
-  Serial.print(tm.Minute);
-  Serial.print(':');
-  Serial.print(tm.Second);
-  Serial.print('\t');
+  serialLog(tm.Hour);
+  serialLog(':');
+  serialLog(tm.Minute);
+  serialLog(':');
+  serialLog(tm.Second);
+  serialLog('\t');
   // Fecha
-  Serial.print(tm.Day);
-  Serial.print('/');
-  Serial.print(tm.Month);
-  Serial.print('/');
-  Serial.println(tmYearToCalendar(tm.Year));
+  serialLog(tm.Day);
+  serialLog('/');
+  serialLog(tm.Month);
+  serialLog('/');
+  serialLogLn(tmYearToCalendar(tm.Year));
 }
 
 /**
-   Funcion callback que activa el relevador en el pin 3 (horario prohibido)
+   Funcion callback que activa la luz roja y desactiva la verde
 */
 void horasSilencio()
 {
-  Serial.println("SHHH!");
-  digitalWrite(RED, HIGH);
+  digitalWrite(GREEN, LOW );
+  digitalWrite(RED,   HIGH);
 }
  
 /**
-   Funcion callback que desactiva el relevador en el pin 3 (horario de bien)
+   Funcion callback que desactiva la luz roja y activa la verde
 */
 void horasLibertad()
 {
-  Serial.println("Yay!!");
-  digitalWrite(GREEN, LOW);
+  digitalWrite(GREEN, HIGH);
+  digitalWrite(RED,   LOW );
 }
 
 /**
@@ -221,3 +234,29 @@ void lights() //WIP
     digitalWrite(j, LOW);
   }
 }
+
+/* Reporte serial */
+#ifdef LOG
+void customLog(status st) {
+  switch (st)
+  {
+  case status::instanteUndef:
+    serialLogLn("status::instanteUndef");
+    break;
+  case status::instanteOk:
+    serialLogLn("status::instanteOk");
+    break;
+  case status::instanteSh:
+    serialLogLn("status::instanteSh");
+    break;
+  case status::fiestuki:
+    serialLogLn("status::fiestuki");
+    break;
+  default:
+    serialLogLn("Switch default. Status not found");
+    break;
+  }
+}
+#else
+void customLog(status st){};
+#endif
