@@ -4,13 +4,9 @@
 
 // Definiciones de pines para cada placa
 #ifdef ARDUINO_AVR_NANO
-  // LCD Pins definitions
-  #define LCD_RS 7
-  #define LCD_EN 6
-  #define LCD_D4 5
-  #define LCD_D5 4
-  #define LCD_D6 3
-  #define LCD_D7 2
+  // Button input
+  #define MODE_SELECTOR 7 // TODO: TBR
+  // OUTPUT LIGHTS
   #define RED 8
   #define BLUE 9
   #define YELLOW 10
@@ -24,18 +20,28 @@ typedef struct {
   uint8_t secs;
 } dayOffset_t;
 
+enum status {
+  instanteUndef,
+  instanteOk,
+  instanteSh,
+  fiestuki
+};
+
 static tmElements_t tm;
 static dayOffset_t td;
-static bool malMomento, prevMomento;
+static status currentStatus{instanteUndef}, prevStatus{instanteUndef};
 
 void setup() {
   Serial.begin(9600);
-  pinMode(8, OUTPUT);
+  pinMode(MODE_SELECTOR, INPUT);
+  pinMode(RED,    OUTPUT);
+  pinMode(BLUE,   OUTPUT);
+  pinMode(YELLOW, OUTPUT);
+  pinMode(GREEN,  OUTPUT);
+
   setSyncProvider(RTC.get);
   if (timeStatus() != timeSet)
     Serial.println("Fallo de RTC");
-
-  horasLibertad(); // Un primer print en pantalla que dice que todo está bien. Si no, se actualiza al otro estado durante la ejecución
 }
 
 void loop() {
@@ -46,15 +52,32 @@ void loop() {
     td.hour = tm.Hour;
     td.mins = tm.Minute;
     td.secs = tm.Second;
-
-    prevMomento = malMomento; // Almacenamos el estado anterior
-    malMomento = instanteEnHorarioSilencio(td, tm.Wday); // Comprobamos en qué horario estamos
-
-    if (prevMomento != malMomento) { // Solo actualizamos si ha cambiado el estado
-      (malMomento) ? horasSilencio() : horasLibertad();
+    
+    if (digitalRead(MODE_SELECTOR) == HIGH) {
+      // Establecer cambio de modo: en fiesta cambia a indefinido y si no lo está, al fiesta
+      currentStatus = (currentStatus == status::fiestuki) ? status::instanteUndef : status::fiestuki;
     }
 
-    delay(450); // Tiempo de espera lo suficientemente alto como para no procesar estados en los que no hay cambio
+    if (currentStatus != status::fiestuki) // Comprobamos en qué horario estamos si no es modo fiesta
+      currentStatus = instanteEnHorarioSilencio(td, tm.Wday);
+
+    if (prevStatus != currentStatus) { // Solo actualizamos si ha cambiado el estado
+      switch (currentStatus)
+      {
+      case status::instanteOk:
+        horasLibertad();
+        break;
+      case status::instanteSh:
+        horasSilencio();
+        break;
+      case status::fiestuki:
+        lights();
+        break;
+      
+      default:
+        break;
+      }
+    }
   }
   else {
     if (RTC.chipPresent()) {
@@ -68,13 +91,14 @@ void loop() {
     }
     delay(100); // Si limpias la pantalla muy seguido se ve rara
   }
+  prevStatus = currentStatus; // Almacenamos el estado anterior
 }
 
 /**
    Comprueba si el instante de tiempo pasado como argumento se encuentra en alguno de los horarios que debe haber silencio
    Cambia esta funcion para contemplar otros horarios
 */
-uint8_t instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
+enum status instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
   static bool malMomento;
   malMomento = false;
   switch (wDay) {
@@ -99,7 +123,7 @@ uint8_t instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
     {21, 30, 0 }, 
     {8 , 30, 0 },
     t);
-  return malMomento;
+  return malMomento ? status::instanteSh : status::instanteOk;
 }
 
 /**
@@ -127,7 +151,7 @@ void imprimir_fecha_hora(){
 void horasSilencio()
 {
   Serial.println("SHHH!");
-  digitalWrite(8, HIGH);
+  digitalWrite(RED, HIGH);
 }
  
 /**
@@ -136,7 +160,7 @@ void horasSilencio()
 void horasLibertad()
 {
   Serial.println("Yay!!");
-  digitalWrite(8, LOW);
+  digitalWrite(GREEN, LOW);
 }
 
 /**
@@ -153,9 +177,10 @@ bool isBetween_timeIgnoreDOW(dayOffset_t time1, dayOffset_t time2, dayOffset_t c
   return (cmpScs <= t2Secs || t1Secs <= cmpScs);
 }
 
-/** Modo fiestuqui, es posible que oara que funcione haya que cambiar delays por comparación de millis
+/** Modo fiestuqui, es posible que para que funcione haya que cambiar delays por comparación de millis
+ * Sí, tocará usar millis para que no interfiera con la bellísima máquina de estados
 */
-void lights()
+void lights() //WIP
 {
   uint8_t i=0;
   uint8_t j=0;
@@ -164,13 +189,13 @@ void lights()
       case 0:
         j= RED;
       break;
-      case 0:
+      case 1:
         j= BLUE;
       break;
-      case 0:
+      case 2:
         j= YELLOW;
       break;
-      case 0:
+      case 3:
         j= GREEN;
       break;
     }
@@ -182,13 +207,13 @@ void lights()
       case 0:
         j= RED;
       break;
-      case 0:
+      case 1:
         j= BLUE;
       break;
-      case 0:
+      case 2:
         j= YELLOW;
       break;
-      case 0:
+      case 3:
         j= GREEN;
       break;
     }
