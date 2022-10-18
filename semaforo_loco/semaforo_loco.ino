@@ -111,13 +111,13 @@ void loop() {
   else {
     if (RTC.chipPresent()) {
       // El reloj esta detenido, es necesario ponerlo a tiempo
-      serialLog("DS1307 DETENIDO: EJECUTE PROGRAMA DE CARGA");
+      serialLogLn("DS1307 DETENIDO: EJECUTE PROGRAMA DE CARGA");
     }
     else {
       // No se puede comunicar con el RTC en el bus I2C, revisar las conexiones.
-      serialLog("DS1307 NO SE PUDO DETECTAR");
+      serialLogLn("DS1307 NO SE PUDO DETECTAR");
     }
-    delay(100); // Si limpias la pantalla muy seguido se ve rara
+    delay(250); // Si limpias la pantalla muy seguido se ve rara
   }
   prevStatus = currentStatus; // Almacenamos el estado anterior
 }
@@ -250,7 +250,7 @@ void lights() //WIP
     
     break;
   default:
-    break;
+    ciclo = 0;
   }
 }
 
