@@ -2,24 +2,37 @@
 #include <Time.h>
 #include <DS1307RTC.h>
 
+#define LOG
+
+// Todo sea por que las extensiones de VSCode funcionen
+#include <Arduino.h>
+#define ARDUINO_AVR_NANO
+
+// Flags para las luces que se van a encender por posición
+#define LIGHT_FLAG_1 0x01
+#define LIGHT_FLAG_2 0x02
+#define LIGHT_FLAG_3 0x04
+#define LIGHT_FLAG_4 0x08
+
 // Definiciones de pines para cada placa
 #ifdef ARDUINO_AVR_NANO
-  // Button input
+  // Button change-mode input
   #define MODE_SELECTOR 7 // TODO: TBR
   // OUTPUT LIGHTS
-  #define RED 8
-  #define BLUE 9
-  #define YELLOW 10
-  #define GREEN 11
+  #define LIGHT_PIN_1 8
+  #define LIGHT_PIN_2 9
+  #define LIGHT_PIN_3 10
+  #define LIGHT_PIN_4 11
 #endif //!ARDUINO_AVR_NANO
 
 /* Some logging utilities */
+// More at the end of file
 #ifdef LOG
     #define serialLog(msg) Serial.print(msg)
     #define serialLogLn(msg) Serial.println(msg)
 #else
-    #define serialLog(msg);
-    #define serialLogLn(msg);
+    #define serialLog(msg)
+    #define serialLogLn(msg)
 #endif
 
 #define tmDow2secs(t) (t.hour * 3600UL + t.mins * 60UL + t.secs)
@@ -45,10 +58,10 @@ void setup() {
   Serial.begin(9600);
 #endif
   pinMode(MODE_SELECTOR, INPUT);
-  pinMode(RED,    OUTPUT);
-  pinMode(BLUE,   OUTPUT);
-  pinMode(YELLOW, OUTPUT);
-  pinMode(GREEN,  OUTPUT);
+  pinMode(LIGHT_PIN_1, OUTPUT);
+  pinMode(LIGHT_PIN_2, OUTPUT);
+  pinMode(LIGHT_PIN_3, OUTPUT);
+  pinMode(LIGHT_PIN_4, OUTPUT);
 
   setSyncProvider(RTC.get);
   if (timeStatus() != timeSet)
@@ -69,19 +82,22 @@ void loop() {
     if (digitalRead(MODE_SELECTOR) == HIGH) {
       // Establecer cambio de modo: en fiesta cambia a indefinido y si no lo está, al fiesta
       currentStatus = (currentStatus == status::fiestuki) ? status::instanteUndef : status::fiestuki;
+      delay(50);
     }
 
     if (currentStatus != status::fiestuki) // Comprobamos en qué horario estamos si no es modo fiesta
       currentStatus = instanteEnHorarioSilencio(td, tm.Wday);
 
-    if (prevStatus != currentStatus) { // Solo actualizamos si ha cambiado el estado
-      switch (currentStatus)
-      {
+    switch (currentStatus)
+    {
       case status::instanteOk:
-        horasLibertad();
-        break;
       case status::instanteSh:
-        horasSilencio();
+        if (prevStatus != currentStatus) { // Solo actualizamos si ha cambiado el estado
+          if (currentStatus == status::instanteOk)
+            horasLibertad();
+          else if (currentStatus == status::instanteSh)
+            horasSilencio();
+        }
         break;
       case status::fiestuki:
         lights();
@@ -89,7 +105,6 @@ void loop() {
       
       default:
         break;
-      }
     }
     customLog(currentStatus);
   }
@@ -163,8 +178,7 @@ void imprimir_fecha_hora(){
 */
 void horasSilencio()
 {
-  digitalWrite(GREEN, LOW );
-  digitalWrite(RED,   HIGH);
+  switch_lights(LIGHT_FLAG_1);
 }
  
 /**
@@ -172,8 +186,7 @@ void horasSilencio()
 */
 void horasLibertad()
 {
-  digitalWrite(GREEN, HIGH);
-  digitalWrite(RED,   LOW );
+  switch_lights(LIGHT_FLAG_2);
 }
 
 /**
@@ -197,42 +210,55 @@ void lights() //WIP
 {
   uint8_t i=0;
   uint8_t j=0;
-  for (i=0; i=3; i++){
-    switch (i) {
-      case 0:
-        j= RED;
-      break;
-      case 1:
-        j= BLUE;
-      break;
-      case 2:
-        j= YELLOW;
-      break;
-      case 3:
-        j= GREEN;
-      break;
+  uint8_t lights_mask = 0;
+  static unsigned long pasttime;
+  static unsigned long cycletime;
+  static int ciclo;
+  switch (ciclo)
+  {
+  case 0:
+    cycletime = pasttime = millis();
+    ciclo++;
+    break;
+  case 1:
+    i = static_cast<uint8_t> (millis()-cycletime)/500;
+    lights_mask = 0x01 << i;
+    if(i > 3){
+      cycletime = millis();
+      ciclo++;
     }
-    digitalWrite(j, HIGH);
-    digitalWrite(j, LOW);
-  }
-  for (i=3; i=0; i--){
-    switch (i) {
-      case 0:
-        j= RED;
-      break;
-      case 1:
-        j= BLUE;
-      break;
-      case 2:
-        j= YELLOW;
-      break;
-      case 3:
-        j= GREEN;
-      break;
+    switch_lights(lights_mask);
+    break;
+  case 2:
+    i = static_cast<uint8_t> (millis()-cycletime)/500;
+    lights_mask = 0x08 >> i;
+    if(i > 3){
+      cycletime = millis();
+      ciclo++;
     }
-    digitalWrite(j, HIGH);
-    digitalWrite(j, LOW);
+    switch_lights(lights_mask);
+    break;
+  case 3:
+    i = static_cast<uint8_t> (millis()-pasttime)/500;
+    if(i%2==0){
+      lights_mask = 0x05;
+    }
+    else{
+      lights_mask = 0x05 << i;
+    }
+    
+    
+    break;
+  default:
+    break;
   }
+}
+
+void switch_lights(uint8_t lights_mask){
+  digitalWrite(LIGHT_PIN_1, LIGHT_FLAG_1&lights_mask);
+  digitalWrite(LIGHT_PIN_2, LIGHT_FLAG_2&lights_mask);
+  digitalWrite(LIGHT_PIN_3, LIGHT_FLAG_3&lights_mask);
+  digitalWrite(LIGHT_PIN_4, LIGHT_FLAG_4&lights_mask);
 }
 
 /* Reporte serial */
