@@ -1,8 +1,8 @@
 //Horarios prohibidos by Marce by CREA by tuviejosabroso
 #include <Time.h>
-#include <DS1307RTC.h>
+#include "DS1307RTC.h"
 
-#define LOG
+//#define LOG
 
 // Todo sea por que las extensiones de VSCode funcionen
 #include <Arduino.h>
@@ -19,10 +19,10 @@
   // Button change-mode input
   #define MODE_SELECTOR 7 // TODO: TBR
   // OUTPUT LIGHTS
-  #define LIGHT_PIN_1 8
-  #define LIGHT_PIN_2 9
-  #define LIGHT_PIN_3 10
-  #define LIGHT_PIN_4 11
+  #define LIGHT_PIN_1 9
+  #define LIGHT_PIN_2 10
+  #define LIGHT_PIN_3 11
+  #define LIGHT_PIN_4 12
 #endif //!ARDUINO_AVR_NANO
 
 /* Some logging utilities */
@@ -66,13 +66,14 @@ void setup() {
   setSyncProvider(RTC.get);
   if (timeStatus() != timeSet)
     serialLogLn("Fallo de RTC");
+  serialLogLn("Arduino Online");
 }
 
 void loop() {
   // Obtener la fecha y hora desde el chip RTC
   if (RTC.read(tm)) {
 #ifdef LOG
-    imprimir_fecha_hora();
+    // imprimir_fecha_hora();
 #endif
 
     td.hour = tm.Hour;
@@ -82,7 +83,7 @@ void loop() {
     if (digitalRead(MODE_SELECTOR) == HIGH) {
       // Establecer cambio de modo: en fiesta cambia a indefinido y si no lo está, al fiesta
       currentStatus = (currentStatus == status::fiestuki) ? status::instanteUndef : status::fiestuki;
-      delay(50);
+      delay(150);
     }
 
     if (currentStatus != status::fiestuki) // Comprobamos en qué horario estamos si no es modo fiesta
@@ -100,7 +101,8 @@ void loop() {
         }
         break;
       case status::fiestuki:
-        lights();
+        // serialLogLn("Estamos en fiesta");
+        modo_fiestuki();
         break;
       
       default:
@@ -178,7 +180,7 @@ void imprimir_fecha_hora(){
 */
 void horasSilencio()
 {
-  switch_lights(LIGHT_FLAG_1);
+  switch_lights(LIGHT_FLAG_4);
 }
  
 /**
@@ -186,7 +188,7 @@ void horasSilencio()
 */
 void horasLibertad()
 {
-  switch_lights(LIGHT_FLAG_2);
+  switch_lights(LIGHT_FLAG_1);
 }
 
 /**
@@ -206,7 +208,7 @@ bool isBetween_timeIgnoreDOW(dayOffset_t time1, dayOffset_t time2, dayOffset_t c
 /** Modo fiestuqui, es posible que para que funcione haya que cambiar delays por comparación de millis
  * Sí, tocará usar millis para que no interfiera con la bellísima máquina de estados
 */
-void lights() //WIP
+void modo_fiestuki() //WIP
 {
   uint8_t i=0;
   uint8_t j=0;
@@ -214,6 +216,8 @@ void lights() //WIP
   static unsigned long pasttime;
   static unsigned long cycletime;
   static int ciclo;
+  serialLogLn(ciclo);
+  delay(100);
   switch (ciclo)
   {
   case 0:
@@ -221,7 +225,7 @@ void lights() //WIP
     ciclo++;
     break;
   case 1:
-    i = static_cast<uint8_t> (millis()-cycletime)/500;
+    i = static_cast<unsigned long> (millis()-cycletime)/500;
     lights_mask = 0x01 << i;
     if(i > 3){
       cycletime = millis();
@@ -230,7 +234,7 @@ void lights() //WIP
     switch_lights(lights_mask);
     break;
   case 2:
-    i = static_cast<uint8_t> (millis()-cycletime)/500;
+    i = static_cast<unsigned long> (millis()-cycletime)/500;
     lights_mask = 0x08 >> i;
     if(i > 3){
       cycletime = millis();
@@ -239,21 +243,30 @@ void lights() //WIP
     switch_lights(lights_mask);
     break;
   case 3:
-    i = static_cast<uint8_t> (millis()-pasttime)/500;
+    i = static_cast<unsigned long> (millis()-pasttime)/500;
+    if(i > 20){
+      cycletime = millis();
+      ciclo++;
+    }
     if(i%2==0){
       lights_mask = 0x05;
     }
     else{
-      lights_mask = 0x05 << i;
+      lights_mask = 0x0A;
     }
-    
-    
+    switch_lights(lights_mask);
     break;
   default:
     ciclo = 0;
   }
+  serialLogLn(i);
 }
 
+/**
+ * @brief Turns on and off lights depending on a binary mask
+ * 
+ * @param lights_mask 8-bit mask to set the output to each bit
+ */
 void switch_lights(uint8_t lights_mask){
   digitalWrite(LIGHT_PIN_1, LIGHT_FLAG_1&lights_mask);
   digitalWrite(LIGHT_PIN_2, LIGHT_FLAG_2&lights_mask);
