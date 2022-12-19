@@ -1,8 +1,8 @@
 //Horarios prohibidos by Marce by CREA by tuviejosabroso
-#include <Time.h>
+#include <iso646.h>
 #include "DS1307RTC.h"
 
-//#define LOG
+// #define LOG
 
 // Todo sea por que las extensiones de VSCode funcionen
 #include <Arduino.h>
@@ -46,6 +46,8 @@ enum status {
   instanteUndef,
   instanteOk,
   instanteSh,
+  janitorApproaching,
+  emptyness,
   fiestuki
 };
 
@@ -73,7 +75,7 @@ void loop() {
   // Obtener la fecha y hora desde el chip RTC
   if (RTC.read(tm)) {
 #ifdef LOG
-    // imprimir_fecha_hora();
+    imprimir_fecha_hora();
 #endif
 
     td.hour = tm.Hour;
@@ -87,24 +89,32 @@ void loop() {
     }
 
     if (currentStatus != status::fiestuki) // Comprobamos en qué horario estamos si no es modo fiesta
-      currentStatus = instanteEnHorarioSilencio(td, tm.Wday);
+      currentStatus = obtenerInstante(td, tm.Wday);
 
     switch (currentStatus)
     {
       case status::instanteOk:
       case status::instanteSh:
+      case status::janitorApproaching:
+      case status::emptyness:
         if (prevStatus != currentStatus) { // Solo actualizamos si ha cambiado el estado
+          switch_lights(0x0F);
+          delay(5*1000);
           if (currentStatus == status::instanteOk)
-            horasLibertad();
+            switch_lights(LIGHT_FLAG_1);
           else if (currentStatus == status::instanteSh)
-            horasSilencio();
+            switch_lights(LIGHT_FLAG_4);
+          else if (currentStatus == status::janitorApproaching)
+            switch_lights(LIGHT_FLAG_2);
+          else if (currentStatus == status::emptyness)
+            switch_lights(0x00);
         }
         break;
       case status::fiestuki:
         // serialLogLn("Estamos en fiesta");
         modo_fiestuki();
         break;
-      
+
       default:
         break;
     }
@@ -128,19 +138,22 @@ void loop() {
    Comprueba si el instante de tiempo pasado como argumento se encuentra en alguno de los horarios que debe haber silencio
    Cambia esta funcion para contemplar otros horarios
 */
-enum status instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
-  static bool malMomento;
-  malMomento = false;
+enum status obtenerInstante(dayOffset_t t, timeDayOfWeek_t wDay) {
+  bool momentoSilencio{false}, momentoIrSaliendo{false}, momentoVacio{false};
   switch (wDay) {
-    case dowTuesday:
-      malMomento |= isBetween_timeIgnoreDOW(
-        {17, 25, 0 }, 
+    case dowThursday:
+      momentoSilencio |= isBetween_timeIgnoreDOW(
+        {11, 25, 0 },
+        {13, 35, 0 },
+        t);
+      momentoSilencio |= isBetween_timeIgnoreDOW(
+        {15, 25, 0 },
         {19, 35, 0 },
         t);
       break;
-    case dowThursday:
-      malMomento |= isBetween_timeIgnoreDOW(
-        {11, 25, 0 }, 
+    case dowFriday:
+      momentoSilencio |= isBetween_timeIgnoreDOW(
+        {11, 25, 0 },
         {13, 35, 0 },
         t);
       break;
@@ -148,12 +161,35 @@ enum status instanteEnHorarioSilencio(dayOffset_t t, uint8_t wDay) {
     default:
       break;
   }
-
-  malMomento |= isBetween_timeIgnoreDOW(
-    {21, 30, 0 }, 
+  // Fuera de hora todos los días
+  momentoSilencio |= isBetween_timeIgnoreDOW(
+    {21, 30, 0 },
     {8 , 30, 0 },
     t);
-  return malMomento ? status::instanteSh : status::instanteOk;
+
+  // Ojo que vienen los conserjes a darnos una paliza gitana
+  momentoIrSaliendo |= isBetween_timeIgnoreDOW(
+    {21, 15, 0 },
+    {21, 30, 0 },
+    t);
+  
+  // No es necesario encender nada ya que no debería haber nadie (repito: NADIE) en la sala
+  momentoVacio |= isBetween_timeIgnoreDOW(
+    {21, 31, 0 },
+    {8 , 30, 0},
+    t);
+  serialLog("momento vacío  I: ");
+  serialLogLn(momentoVacio);
+
+  momentoVacio |= (wDay == dowSaturday) or (wDay == dowSunday);
+  serialLog("momento vacío II: ");
+  serialLogLn(momentoVacio);
+
+  if(momentoVacio)
+    return status::emptyness;
+  if(momentoIrSaliendo)
+    return status::janitorApproaching;
+  return momentoSilencio ? status::instanteSh : status::instanteOk;
 }
 
 /**
@@ -163,32 +199,25 @@ void imprimir_fecha_hora(){
   // Hora
   serialLog(tm.Hour);
   serialLog(':');
+  if(tm.Minute < 9)
+    serialLog('0');
   serialLog(tm.Minute);
   serialLog(':');
+  if(tm.Second < 9)
+    serialLog('0');
   serialLog(tm.Second);
   serialLog('\t');
+  // Dia
+  serialLog(tm.Wday);
+  serialLog('\t');
   // Fecha
+  if(tm.Day < 9)
+    serialLog('0');
   serialLog(tm.Day);
   serialLog('/');
   serialLog(tm.Month);
   serialLog('/');
   serialLogLn(tmYearToCalendar(tm.Year));
-}
-
-/**
-   Funcion callback que activa la luz roja y desactiva la verde
-*/
-void horasSilencio()
-{
-  switch_lights(LIGHT_FLAG_4);
-}
- 
-/**
-   Funcion callback que desactiva la luz roja y activa la verde
-*/
-void horasLibertad()
-{
-  switch_lights(LIGHT_FLAG_1);
 }
 
 /**
@@ -210,8 +239,7 @@ bool isBetween_timeIgnoreDOW(dayOffset_t time1, dayOffset_t time2, dayOffset_t c
 */
 void modo_fiestuki() //WIP
 {
-  uint8_t i=0;
-  uint8_t j=0;
+  uint8_t i = 0;
   uint8_t lights_mask = 0;
   static unsigned long pasttime;
   static unsigned long cycletime;
@@ -225,6 +253,8 @@ void modo_fiestuki() //WIP
     ciclo++;
     break;
   case 1:
+  case 3:
+  case 5:
     i = static_cast<unsigned long> (millis()-cycletime)/500;
     lights_mask = 0x01 << i;
     if(i > 3){
@@ -234,6 +264,8 @@ void modo_fiestuki() //WIP
     switch_lights(lights_mask);
     break;
   case 2:
+  case 4:
+  case 6:
     i = static_cast<unsigned long> (millis()-cycletime)/500;
     lights_mask = 0x08 >> i;
     if(i > 3){
@@ -242,8 +274,8 @@ void modo_fiestuki() //WIP
     }
     switch_lights(lights_mask);
     break;
-  case 3:
-    i = static_cast<unsigned long> (millis()-pasttime)/500;
+  case 7:
+    i = static_cast<unsigned long> (millis()-cycletime)/500;
     if(i > 20){
       cycletime = millis();
       ciclo++;
@@ -260,6 +292,7 @@ void modo_fiestuki() //WIP
     ciclo = 0;
   }
   serialLogLn(i);
+  // delay(250);
 }
 
 /**
@@ -290,6 +323,12 @@ void customLog(status st) {
     break;
   case status::fiestuki:
     serialLogLn("status::fiestuki");
+    break;
+  case status::janitorApproaching:
+    serialLogLn("status::janitorApproaching");
+    break;
+  case status::emptyness:
+    serialLogLn("status::emptyness");
     break;
   default:
     serialLogLn("Switch default. Status not found");
